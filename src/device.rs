@@ -17,7 +17,7 @@ pub async fn device_task(candidate: CandidateDevice, token: CancellationToken) {
     let device = async || -> Result<Device, MirajazzError> {
         let device = connect(&candidate).await?;
 
-        device.set_brightness(50).await?;
+        device.set_brightness(100).await?;
         device.clear_all_button_images().await?;
         device.flush().await?;
 
@@ -98,6 +98,7 @@ pub async fn handle_error(id: &String, err: MirajazzError) -> bool {
 }
 
 pub async fn connect(candidate: &CandidateDevice) -> Result<Device, MirajazzError> {
+    log::debug!("Tyring to connect to the device...");
     let result = Device::connect(
         &candidate.dev,
         candidate.kind.protocol_version(),

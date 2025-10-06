@@ -9,6 +9,8 @@ use watcher::watcher_task;
 #[cfg(not(target_os = "windows"))]
 use tokio::signal::unix::{SignalKind, signal};
 
+use std::fs::File;
+
 mod device;
 mod inputs;
 mod mappings;
@@ -129,13 +131,15 @@ async fn sigterm() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    simplelog::TermLogger::init(
+    let file = File::create("/tmp/plugin.txt")?;
+    simplelog::WriteLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default(), file).unwrap();
+    /*simplelog::TermLogger::init(
         simplelog::LevelFilter::Info,
         simplelog::Config::default(),
         simplelog::TerminalMode::Stdout,
         simplelog::ColorChoice::Never,
     )
-    .unwrap();
+    .unwrap();*/
 
     tokio::select! {
         _ = connect() => {},
