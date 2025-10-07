@@ -1,6 +1,6 @@
 use data_url::DataUrl;
 use image::load_from_memory_with_format;
-use mirajazz::{device::Device, error::MirajazzError, state::DeviceStateUpdate};
+use mirajazz::{device::Device, error::MirajazzError, state::DeviceStateUpdate, types::ImageFormat};
 use openaction::{OUTBOUND_EVENT_MANAGER, SetImageEvent};
 use tokio_util::sync::CancellationToken;
 
@@ -177,8 +177,36 @@ async fn device_events_task(candidate: &CandidateDevice) -> Result<(), MirajazzE
 
 /// Handles different combinations of "set image" event, including clearing the specific buttons and whole device
 pub async fn handle_set_image(device: &Device, evt: SetImageEvent) -> Result<(), MirajazzError> {
-    match (evt.position, evt.image) {
+    // Image positions are a bit different and not simply incrementing
+    // Incoming positions:
+    // [ 0] [] [] [] [ 4]
+    // [ 5] [] [] [] [ 9]
+    //  [10] [] [] [13]
+    // Correct positions:
+    // [10] [] [] [] [14]
+    // [ 5] [] [] [] [ 9]
+    //  [ 0] [] [] [ 3]
+    if evt.position != None {
+        log::debug!("Incoming position: {:?}", evt.position);
+    }
+    let corrected_pos = match evt.position {
+        None => None,
+        Some(pos) => match pos {
+            (0..=4) => Some(pos + 10),
+            (5..=9) => Some(pos),
+            (10..=13) => Some(pos - 10),
+            _ => {
+                log::error!("Incorrect position: {:?}", pos);
+                return Err(MirajazzError::InvalidKeyIndex);
+            }
+        }
+    };
+    if evt.position != None {
+        log::debug!("Corrected position: {:?}", corrected_pos);
+    }
+    match (corrected_pos, evt.image) {
         (Some(position), Some(image)) => {
+
             log::info!("Setting image for button {}", position);
 
             // OpenDeck sends image as a data url, so parse it using a library
@@ -194,12 +222,23 @@ pub async fn handle_set_image(device: &Device, evt: SetImageEvent) -> Result<(),
 
             let image = load_from_memory_with_format(body.as_slice(), image::ImageFormat::Jpeg)?;
 
+            let image_format: ImageFormat;
+
+            if position < 4 {
+                // Wider touchscreen buttons
+                image_format = Kind::from_vid_pid(device.vid, device.pid)
+                        .unwrap()
+                        .image_format_secondscreen()
+            } else {
+                image_format = Kind::from_vid_pid(device.vid, device.pid)
+                        .unwrap()
+                        .image_format()
+            }
+
             device
                 .set_button_image(
                     position,
-                    Kind::from_vid_pid(device.vid, device.pid)
-                        .unwrap()
-                        .image_format(),
+                    image_format,
                     image,
                 )
                 .await?;

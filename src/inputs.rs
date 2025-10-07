@@ -6,9 +6,9 @@ pub fn process_input(input: u8, state: u8) -> Result<DeviceInput, MirajazzError>
     log::debug!("Processing input: {}, {}", input, state);
 
     match input {
-        (0..=6) | 0x25 | 0x30 | 0x31 => read_button_press(input, state),
-        0x90 | 0x91 | 0x50 | 0x51 | 0x60 | 0x61 => read_encoder_value(input),
-        0x33..=0x35 => read_encoder_press(input, state),
+        (0..=10) | (64..=67) | 56 | 57 => read_button_press(input, state),
+        160 | 161 | 80 | 81 | 144 | 145 | 112 | 113 => read_encoder_value(input),
+        51 | 53 | 54 | 55 => read_encoder_press(input, state),
         _ => Err(MirajazzError::BadData),
     }
 }
@@ -23,7 +23,7 @@ fn read_button_states(states: &[u8]) -> Vec<bool> {
     bools
 }
 
-fn read_button_press(input: u8, state: u8) -> Result<DeviceInput, MirajazzError> {
+fn read_button_press(input: u8, mut state: u8) -> Result<DeviceInput, MirajazzError> {
     let mut button_states = vec![0x01];
     button_states.extend(vec![0u8; KEY_COUNT + 1]);
 
@@ -33,15 +33,22 @@ fn read_button_press(input: u8, state: u8) -> Result<DeviceInput, MirajazzError>
         )));
     }
 
+    log::debug!("Incoming input: {:#?}", input);
     let pressed_index: usize = match input {
-        // Six buttons with displays
-        (1..=6) => input as usize,
-        // Three buttons without displays
-        0x25 => 7,
-        0x30 => 8,
-        0x31 => 9,
+        // 10 buttons with displays
+        (1..=10) => input as usize,
+        // 4 "buttons" on the touch screen, they only send state 0
+        (64..=67) => (input) as usize - 53,
+        // TODO: Swiping actions, they only send state 0 and do not appear as buttons currently
+        56 => 15, // From left to right
+        57 => 16, // From right to left
         _ => return Err(MirajazzError::BadData),
     };
+    // TODO: Handle single-state touchscreen button
+    // if pressed_index >= 11 && pressed_index <= 14 {
+    //     state = 1;
+    // }
+    log::debug!("Corrected pressed index: {:#?}", pressed_index);
 
     button_states[pressed_index] = state;
 
@@ -54,15 +61,18 @@ fn read_encoder_value(input: u8) -> Result<DeviceInput, MirajazzError> {
     let mut encoder_values = vec![0i8; ENCODER_COUNT];
 
     let (encoder, value): (usize, i8) = match input {
-        // Left encoder
-        0x90 => (0, -1),
-        0x91 => (0, 1),
-        // Middle (top) encoder
-        0x50 => (1, -1),
-        0x51 => (1, 1),
-        // Right encoder
-        0x60 => (2, -1),
-        0x61 => (2, 1),
+        // Left most encoder
+        160 => (0, -1),
+        161 => (0, 1),
+        // Middle left encoder
+        80 => (1, -1),
+        81 => (1, 1),
+        // Middle right encoder
+        144 => (2, -1),
+        145 => (2, 1),
+        // Right most encoder
+        112 => (3, -1),
+        113 => (3, 1),
         _ => return Err(MirajazzError::BadData),
     };
 
@@ -70,13 +80,19 @@ fn read_encoder_value(input: u8) -> Result<DeviceInput, MirajazzError> {
     Ok(DeviceInput::EncoderTwist(encoder_values))
 }
 
-fn read_encoder_press(input: u8, state: u8) -> Result<DeviceInput, MirajazzError> {
+// TODO: Encoders only send a pushed state with state = 1 but no released state
+fn read_encoder_press(input: u8, mut state: u8) -> Result<DeviceInput, MirajazzError> {
     let mut encoder_states = vec![false; ENCODER_COUNT];
 
     let encoder: usize = match input {
-        0x33 => 0, // Left encoder
-        0x35 => 1, // Middle (top) encoder
-        0x34 => 2, // Right encoder
+        // Left most encoder
+        55 => 0,
+        // Middle left encoder
+        53 => 1,
+        // Middle right encoder
+        51 => 2,
+        // Right most encoder
+        54 => 3,
         _ => return Err(MirajazzError::BadData),
     };
 

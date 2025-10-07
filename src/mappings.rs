@@ -8,7 +8,7 @@ pub const DEVICE_NAMESPACE: &str = "n4";
 
 pub const ROW_COUNT: usize = 3;
 pub const COL_COUNT: usize = 5;
-pub const KEY_COUNT: usize = 10;
+pub const KEY_COUNT: usize = 14;
 pub const ENCODER_COUNT: usize = 4;
 
 #[derive(Debug, Clone)]
@@ -52,25 +52,23 @@ impl Kind {
     /// Returns protocol version for device
     pub fn protocol_version(&self) -> usize {
         match self {
-            Self::N4 => 3,
             _ => 3,
         }
     }
 
     pub fn image_format(&self) -> ImageFormat {
-        if self.protocol_version() == 3 {
-            return ImageFormat {
-                mode: ImageMode::JPEG,
-                size: (60, 60),
-                rotation: ImageRotation::Rot90,
-                mirror: ImageMirroring::None,
-            };
-        }
-
         return ImageFormat {
             mode: ImageMode::JPEG,
-            size: (60, 60),
-            rotation: ImageRotation::Rot0,
+            size: (112, 112),
+            rotation: ImageRotation::Rot180,
+            mirror: ImageMirroring::None,
+        };
+    }
+    pub fn image_format_secondscreen(&self) -> ImageFormat {
+        return ImageFormat {
+            mode: ImageMode::JPEG,
+            size: (176, 112),
+            rotation: ImageRotation::Rot180,
             mirror: ImageMirroring::None,
         };
     }
